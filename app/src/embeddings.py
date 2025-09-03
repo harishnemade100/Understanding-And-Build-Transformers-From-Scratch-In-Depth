@@ -1,41 +1,32 @@
-import torch 
+# embeddings.py
+import math
+import torch
 import torch.nn as nn
-from src.positional_Encoding import PositionalEncoding
+from positional_encoding import PositionalEncoding
 
-class EmbeddingLayer(nn.Module):
-    # Step 1: Function to build vocab from any sentence
-    @classmethod
-    def build_vocab(cls, sentences):
-        vocab = {word: idx for idx, word in enumerate(sorted(set(sentences)))}
-        return vocab
+class TokenEmbedding(nn.Module):
+    """
+    Converts word IDs into embeddings and adds position information.
 
-    @classmethod
-    # Step 2: Function to convert words to IDs using the vocab
-    def sentence_to_ids(cls, sentence, vocab):
-        return [vocab[word] for word in sentence]
+    Steps:
+    1. Each word ID is looked up in an Embedding table (like a dictionary),
+       producing a dense vector that represents the word's meaning.
+    2. A positional encoding is added, so the model knows word order.
+    3. The result is fed into the Transformer.
 
-    # Step 3: Main function to get embeddings from any sentence
-    @classmethod
-    def get_word_embeddings(cls, sentences, embedding_dim=8):
-        # Step 1: Build vocabulary
-        vocab = cls.build_vocab(sentences)
-        vocab_size = len(vocab)
+    Input: [5, 8, 2]  (IDs for "the cat sat")
+    Output: [[0.1, -0.3, ...], [0.7, 0.2, ...], [0.5, -0.8, ...]]
+    """
 
-           # Step 2: Convert sentence to tensor of word IDs
-        input_ids = torch.tensor([cls.sentence_to_ids(sentences, vocab)])  # Shape: (1, seq_len)
+    def __init__(self, vocab_size: int, d_model: int, max_len: int = 512):
+        super().__init__()
+        self.token_embed = nn.Embedding(vocab_size, d_model)
+        self.pos_encoding = PositionalEncoding(d_model, max_len)
+        self.scale = math.sqrt(d_model)  # scaling helps training stability
 
-        # Step 3: Create the embedding layer
-        embedding_layer = nn.Embedding(num_embeddings=vocab_size, embedding_dim=embedding_dim)
-
-        # Step 4: Pass input_ids to embedding layer
-        embeddings = embedding_layer(input_ids)  # Shape: (1, seq_len, embedding_dim)
-
-        embeddings_dict = {word: embeddings[0][i].tolist() for i, word in enumerate(sentences)}
-
-
-        print("Vocabulary:", vocab)
-        print("Input IDs:", input_ids.tolist())
-        print("Embeddings Shape:", embeddings.shape)
-        print("Embeddings:\n", embeddings_dict)
-
-        return PositionalEncoding.position_encoding(sentences, embeddings_dict, embedding_dim)
+    def forward(self, input_ids: torch.LongTensor) -> torch.Tensor:
+        """
+        Convert input_ids into embeddings with position added.
+        """
+        x = self.token_embed(input_ids) * self.scale
+        return self.pos_encoding(x)

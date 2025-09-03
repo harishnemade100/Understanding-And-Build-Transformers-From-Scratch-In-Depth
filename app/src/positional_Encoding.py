@@ -1,34 +1,40 @@
+# positional_encoding.py
 import math
-import numpy as np
+import torch
+import torch.nn as nn
 
+class PositionalEncoding(nn.Module):
+    """
+    Adds position information to word embeddings.
 
+    Problem:
+    - Transformers do not know the order of words in a sentence.
+      For them, "cat sat on mat" and "mat sat on cat" look the same.
+    
+    Solution:
+    - Positional Encoding adds patterns of sine and cosine waves
+      to word embeddings.
+    - These patterns are unique for each position (1st word, 2nd word, etc.),
+      so the model learns "who is where".
 
-class PositionalEncoding:
-    @staticmethod
-    def get_position_encoding(position, embedding_dim):
-        encoding = np.zeros(embedding_dim)
-        for i in range(embedding_dim):
-            angle = position / math.pow(10000, (2 * (i // 2)) / embedding_dim)
-            if i % 2 == 0:
-                encoding[i] = math.sin(angle)
-            else:
-                encoding[i] = math.cos(angle)
-        return encoding
+    Example:
+    Input: embedding for "cat" at position 2
+    Output: embedding + position pattern (so model knows it's the 2nd word).
+    """
 
-    @classmethod
-    def position_encoding(cls, sentence, embeddings_dict, d_model):
+    def __init__(self, d_model: int, max_len: int = 512):
+        super().__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float32) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe)  # saved inside model, not trainable
 
-        final_dict = {}  # Added to store word: final_input mapping
-        final_Vector = []
-        for pos, word in enumerate(sentence):
-            word_vector = np.array(embeddings_dict[word])
-            position_vector = cls.get_position_encoding(pos, d_model)
-            final_input = word_vector + position_vector
-            final_Vector.append(final_input)
-            final_dict[word] = final_input.tolist()
-
-            print(f"\nWord: {word}")
-            print(f"Embedding:         {word_vector}")
-            print(f"Positional Encode: {position_vector}")
-            print(f"Final Input:       {final_input}")
-        return final_Vector, final_dict
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Add positional encoding to embeddings.
+        x: (batch, seq_len, d_model)
+        """
+        seq_len = x.size(1)
+        return x + self.pe[:seq_len, :].unsqueeze(0).to(x.device)
