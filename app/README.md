@@ -2,7 +2,6 @@
 
 This project is a **from-scratch implementation of the Transformer architecture** (the model behind GPT, BERT, etc.) in **PyTorch**.  
 It is designed to be **educational**: with clear modular files, simple tokenization, and detailed docstrings so even beginners or non-technical readers can follow along.
-
 ---
 
 ## 🌟 What is a Transformer?
